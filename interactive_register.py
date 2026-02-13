@@ -1,0 +1,1 @@
+# interactive_register is provide ui registration
