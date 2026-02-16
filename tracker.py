@@ -1,5 +1,5 @@
 # tracker.py
-
+# a centroid tracker to tracking object (face)
 from collections import OrderedDict
 from scipy.spatial import distance as dist
 import numpy as np
