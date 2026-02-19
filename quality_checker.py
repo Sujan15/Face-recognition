@@ -112,6 +112,8 @@ class QualityChecker:
         if not success:
             return None, None, None
 
+
+
         rotation_matrix, _ = cv2.Rodrigues(rotation_vector)
         sy = np.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
        
