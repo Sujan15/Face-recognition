@@ -8,6 +8,7 @@ Key Features
 5. Attendance data logging for analysis and reporting 
 ⚡ Contactless and automated system
 
+![attendance_confirmation](https://github.com/user-attachments/assets/824fa340-fcf2-4487-931f-9a29ccc9480a)
 
 
 
