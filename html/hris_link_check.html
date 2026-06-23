@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title> AI Face Check — Secondary DB</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<style>
+:root {
+  --bg:       #080d14;
+  --surface:  #0d1520;
+  --card:     #0f1c2d;
+  --border:   #1a2d42;
+  --border-hi:#1e3a52;
+  --accent:   #00d4ff;
+  --accent2:  #7c5cfc;
+  --ok:       #22c55e;
+  --warn:     #f59e0b;
+  --err:      #ef4444;
+  --text:     #d1e4f5;
+  --muted:    #5c7a99;
+  --dim:      #1a2d42;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+/* body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 3fr 2fr;
+} */
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+
+  height: 100vh;          /* fixed screen height */
+  overflow: hidden;       /* remove page scroll */
+
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 3fr 2fr;
+}
+
+/* ─── TOPBAR ──────────────────────────────── */
+.topbar {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.topbar h1 { font-size: 15px; font-weight: 700; color: #fff; }
+.spacer    { flex: 1; }
+.clock     { font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; color: var(--accent); }
+
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); padding: 7px 14px; border-radius: 8px;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: .2s;
+}
+.back-btn:hover { border-color: var(--border-hi); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--card); border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 10px; color: var(--muted); font-family: 'Courier New', monospace;
+}
+.badge.ok   { border-color: rgba(34,197,94,.3); color: var(--ok); }
+.badge.blue { border-color: rgba(0,212,255,.3); color: var(--accent); }
+.badge.warn { border-color: rgba(245,158,11,.3); color: var(--warn); }
+
+.conn-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+  flex-shrink: 0;
+  transition: background .3s;
+}
+.conn-dot.live {
+  background: var(--ok);
+  box-shadow: 0 0 0 0 rgba(34,197,94,.5);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%  { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+  70% { box-shadow: 0 0 0 7px rgba(34,197,94,0); }
+  100%{ box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+
+/* ─── LEFT: STREAM STAGE ─────────────────── */
+/* .stage {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+} */
+.stage {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  min-height: 0;
+  overflow: hidden;
+}
+/* Viewport wrapper */
+.viewport {
+  flex: 1;
+  position: relative;
+  background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  transition: border-color .3s, box-shadow .3s;
+  min-height: 0;
+  max-height: calc(100vh - 180px);
+}
+
+.viewport.live {
+  border-color: var(--ok);
+  box-shadow: 0 0 0 4px rgba(34,197,94,.07) inset;
+}
+
+.feed {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* Overlay canvas for bbox drawing */
+#overlayCanvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+/* Corner brackets */
+.corner {
+  position: absolute;
+  width: 28px; height: 28px;
+  border: 2px solid var(--accent);
+  opacity: .5;
+  pointer-events: none;
+}
+.corner.tl { top:10px; left:10px; border-right:0; border-bottom:0; border-radius:3px 0 0 0; }
+.corner.tr { top:10px; right:10px; border-left:0; border-bottom:0; border-radius:0 3px 0 0; }
+.corner.bl { bottom:10px; left:10px; border-right:0; border-top:0; border-radius:0 0 0 3px; }
+.corner.br { bottom:10px; right:10px; border-left:0; border-top:0; border-radius:0 0 3px 0; }
+
+/* HUD bar */
+.hud-bar {
+  position: absolute;
+  bottom: 10px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.65);
+  border: 1px solid rgba(255,255,255,.08);
+  backdrop-filter: blur(4px);
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hud-bar.live { border-color: rgba(34,197,94,.3); color: var(--ok); }
+
+/* Stats row */
+.stats-row {
+  display: flex;
+  gap: 10px;
+}
+.stat-box {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.stat-box .num { font-size: 22px; font-weight: 800; color: #fff; line-height: 1; }
+.stat-box .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
+.stat-box.ok  .num { color: var(--ok); }
+.stat-box.blue .num { color: var(--accent); }
+
+/* ─── RIGHT: LOG PANEL ─────────────────────── */
+/* ─── RIGHT CONFIRMATION PANEL ──────────────────────────────── */
+/* .confirmation-panel {
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+} */
+/* .confirmation-panel {
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+
+  display: flex;
+  flex-direction: column;
+
+  height: calc(100vh - 60px);
+  overflow: hidden;
+} */
+.confirmation-panel {
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+
+  display: flex;
+  flex-direction: column;
+
+  height: 100%;
+  overflow: hidden;
+}
+.conf-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.conf-header h2 {
+  font-size: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted);
+}
+.count-badge {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* .conf-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  gap: 0;
+  overflow: hidden;
+} */
+/* .conf-body {
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+
+  justify-content: flex-start;
+
+  padding: 12px;
+
+  overflow: hidden;
+
+  min-height: 0;
+} */
+.conf-body {
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+
+  /* justify-content: center; */
+  justify-content: flex-start;
+  align-items: center;
+
+  padding: 12px;
+
+  overflow: hidden;
+}
+/* ── Face thumbnail (square, like attendance.html) */
+/* .thumb-wrap {
+  width: 60%;
+  max-width: 100px;
+  padding-top: 100%;
+  position: relative;
+  background: var(--card);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 4px solid var(--border);
+  transition: border-color .3s ease;
+  flex-shrink: 0;
+  margin-bottom: 20px;
+} */
+ .thumb-wrap {
+  width: min(320px, 100%);
+  height: min(320px, 70vh);
+  border-radius: 12px;
+  overflow: hidden;
+  padding-top: 0;
+  border: 2px solid var(--border);
+  position: relative;
+
+  flex-shrink: 1;
+
+  margin-bottom: 10px;
+}
+
+#faceCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Green checkmark stamp */
+.conf-stamp {
+  position: absolute;
+  bottom: 10px; right: 10px;
+  width: 56px; height: 56px;
+  background: var(--ok);
+  border-radius: 50%;
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  border: 4px solid var(--surface);
+  transform: scale(0) rotate(-15deg);
+  opacity: 0;
+  transition: all .28s cubic-bezier(.34,1.56,.64,1);
+  z-index: 2;
+}
+.conf-stamp.blacklist-stamp {
+  background: var(--err);
+}
+.thumb-wrap.confirmed  { border-color: var(--ok); }
+.thumb-wrap.blacklisted-frame { border-color: var(--err); }
+.thumb-wrap.confirmed .conf-stamp,
+.thumb-wrap.blacklisted-frame .conf-stamp  { transform: scale(1) rotate(0deg); opacity: 1; }
+
+/* ── Employee info section */
+.emp-info {
+  width: 100%;
+  max-width: 280px;
+  text-align: center;
+}
+.emp-name {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+.emp-id-badge {
+  display: inline-block;
+  background: var(--accent);
+  color: #040d18;
+  padding: 3px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  font-family: 'Courier New', monospace;
+}
+.emp-id-badge.blacklisted-badge {
+  background: var(--err);
+  color: #fff;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  text-align: left;
+  margin-bottom: 14px;
+}
+.detail-item .lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 2px;
+}
+.detail-item .val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.recog-time {
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  color: var(--accent);
+  background: rgba(0,212,255,.06);
+  border: 1px solid rgba(0,212,255,.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+  text-align: center;
+}
+.recog-time.hidden { opacity: 0; }
+
+.conf-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(34,197,94,.12);
+  color: var(--ok);
+  border: 1px solid rgba(34,197,94,.2);
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.blk-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(239,68,68,.12);
+  color: var(--err);
+  border: 1px solid rgba(239,68,68,.2);
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── History scroll list (below fold) */
+/* .history-header {
+  padding: 10px 18px 6px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+} */
+/* .history-list {
+  overflow-y: auto;
+  max-height: 200px;
+  padding: 6px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+} */
+/* .history-list::-webkit-scrollbar { width: 3px; }
+.history-list::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; } */
+
+/* .hist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  animation: fadeIn .3s ease;
+} */
+/* .hist-row.known { border-left: 3px solid var(--ok); }
+.hist-row.blacklisted { border-left: 3px solid var(--err); }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+.hist-thumb {
+  width: 32px; height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 14px;
+} */
+/* .hist-thumb img { width:100%; height:100%; object-fit:cover; }
+.hist-info { flex:1; min-width:0; }
+.hist-name { font-size: 12px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-sub  { font-size: 10px; color: var(--muted); font-family: 'Courier New', monospace; } */
+
+/* Spin */
+.spin { animation: spin .8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- ─── TOPBAR ─────────────────────────────────────────── -->
+<header class="topbar">
+  <button class="back-btn" onclick="goBack()"><i class="fas fa-arrow-left"></i> Back</button>
+  <h1>AI Face Check</h1>
+  <span class="badge" id="connBadge"><span class="conn-dot" id="connDot"></span>&nbsp;<span id="connTxt">Connecting…</span></span>
+  <span class="badge ok"><i class="fas fa-database"></i>&nbsp;db_context=secondary</span>
+  <span class="badge blue" id="camBadge"><i class="fas fa-video"></i>&nbsp;HRIS LINK</span>
+  <div class="spacer"></div>
+  <span class="clock" id="clock"></span>
+</header>
+
+<!-- ─── LEFT STAGE ────────────────────────────────────── -->
+<section class="stage">
+  <div class="viewport" id="viewport">
+    <canvas id="feed" class="feed"></canvas>
+    <canvas id="overlayCanvas"></canvas>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div class="hud-bar" id="hudBar">SECONDARY DB — LIVE</div> <!--  VECTOR SPACE -->
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-box ok">
+      <div class="num" id="statRecog">0</div>
+      <div class="lbl">Recognized</div>
+    </div>
+    <div class="stat-box">
+      <div class="num" id="statUnknown">0</div>
+      <div class="lbl">Unknown</div>
+    </div>
+    <div class="stat-box blue">
+      <div class="num" id="statFps">—</div>
+      <div class="lbl">Feed FPS</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── RIGHT CONFIRMATION PANEL ──────────────────────────────── -->
+<aside class="confirmation-panel">
+
+  <!-- Header -->
+  <div class="conf-header">
+    <h2><i class="fas fa-user-check"></i>&nbsp; Live Recognition</h2>
+    <span class="count-badge" id="countBadge">0</span>
+  </div>
+
+  <!-- Main confirmation area -->
+  <div class="conf-body">
+
+    <!-- Face thumbnail -->
+    <div class="thumb-wrap" id="thumbWrap">
+      <canvas id="faceCanvas"></canvas>
+      <div class="conf-stamp" id="confStamp"><i class="fas fa-check" id="stampIcon"></i></div>
+    </div>
+
+    <!-- Employee details -->
+    <div class="emp-info" id="empInfo">
+      <div class="emp-name" id="empName">Awaiting Recognition</div>
+      <div class="emp-id-badge" id="empIdBadge">ID: —</div>
+
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="lbl">Department</span>
+          <span class="val" id="empDept">—</span>
+        </div>
+        <div class="detail-item">
+          <span class="lbl">Role</span>
+          <span class="val" id="empRole">—</span>
+        </div>
+        <div class="detail-item">
+          <span class="lbl">Confidence</span>
+          <span class="val" id="empConf">—</span>
+        </div>
+        <div class="detail-item">
+          <span class="lbl">Status</span>
+          <span class="val" id="empStatus">Scanning…</span>
+        </div>
+      </div>
+
+      <div class="recog-time hidden" id="recogTime"></div>
+    </div>
+  </div>
+
+  <!-- History scroll list -->
+  <!-- <div class="history-header">
+    <span><i class="fas fa-clock-rotate-left"></i>&nbsp; Recent</span>
+    <span id="histCount" style="color:var(--accent);font-family:'Courier New',monospace;">0</span>
+  </div>
+  <div class="history-list" id="histList"></div> -->
+
+</aside>
+
+<!-- Hidden canvas for frame snapping -->
+<canvas id="snapCanvas" style="display:none;"></canvas>
+
+<script>
+// ─── Guard ────────────────────────────────────────────────────
+const session = JSON.parse(sessionStorage.getItem('ephemeral') || 'null');
+if (!session || session.mode !== 'chk') {
+  location.replace('/ephemeral');
+}
+
+const TOKEN  = localStorage.getItem('access_token') || '';
+const CAM_ID = session.camId;
+const IP     = session.ip;
+const QS     = `?db_context=secondary&ephemeral_stream=true&ephemeral_ip=${encodeURIComponent(IP)}&ephemeral_cam_id=${encodeURIComponent(CAM_ID)}`;
+
+// ─── DOM refs ─────────────────────────────────────────────────
+const feed          = document.getElementById('feed');       // now a <canvas>
+const feedCtx       = feed.getContext('2d');
+const viewport      = document.getElementById('viewport');
+const hudBar        = document.getElementById('hudBar');
+const countBadge    = document.getElementById('countBadge');
+const overlayCanvas = document.getElementById('overlayCanvas');
+const snapCanvas    = document.getElementById('snapCanvas');
+const octx          = overlayCanvas.getContext('2d');
+const sctx          = snapCanvas.getContext('2d');
+
+// Holds the last decoded frame Image object for cropping
+let lastFrameImg = null;
+
+// Confirmation panel refs
+const thumbWrap  = document.getElementById('thumbWrap');
+const faceCanvas = document.getElementById('faceCanvas');
+const faceCtx    = faceCanvas.getContext('2d');
+const confStamp  = document.getElementById('confStamp');
+const stampIcon  = document.getElementById('stampIcon');
+const empName    = document.getElementById('empName');
+const empIdBadge = document.getElementById('empIdBadge');
+const empDept    = document.getElementById('empDept');
+const empRole    = document.getElementById('empRole');
+const empConf    = document.getElementById('empConf');
+const empStatus  = document.getElementById('empStatus');
+const recogTime  = document.getElementById('recogTime');
+// const histList   = document.getElementById('histList');
+// const histCount  = document.getElementById('histCount');
+
+document.getElementById('camBadge').innerHTML = `<i class="fas fa-video"></i>&nbsp;${CAM_ID.slice(0, 26)}`;
+
+// ─── Clock ────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── Stats state ──────────────────────────────────────────────
+let recogCount   = 0;
+let unknownCount = 0;
+let totalCards   = 0;
+const DEDUP_MS      = 3000;   // 3 s cooldown per recognized ID
+const UNKNOWN_MS    = 2000;   // 2 s dedup for unknown counter
+const recentMap     = new Map();   // employee_id -> last confirmed timestamp
+let   lastUnknownTs = 0;
+
+// ─── Connection ───────────────────────────────────────────────
+function setConn(state) {
+  const dot   = document.getElementById('connDot');
+  const txt   = document.getElementById('connTxt');
+  const badge = document.getElementById('connBadge');
+  if (state === 'live') {
+    dot.classList.add('live');
+    txt.textContent = 'LIVE';
+    badge.classList.add('ok');
+    // viewport / hudBar are updated by onmessage when first real frame arrives
+  } else if (state === 'Connected') {
+    // Auth succeeded, pipeline still loading — show amber dot, no 'live' class yet
+    dot.classList.remove('live');
+    txt.textContent = 'Connected';
+    badge.classList.remove('ok');
+    hudBar.textContent = 'Loading pipeline…';
+  } else {
+    dot.classList.remove('live');
+    txt.textContent = state;
+    badge.classList.remove('ok');
+    viewport.classList.remove('live');
+    hudBar.classList.remove('live');
+    hudBar.textContent = state;
+  }
+}
+
+// ─── FPS monitor (estimated from WS payload frequency) ───────
+let payloadTs = Date.now(), payloadCount = 0;
+
+// ─── Overlay drawing ─────────────────────────────────────────
+let lastResults = [];
+
+function syncOverlay() {
+  if (!feed.width) return;
+  overlayCanvas.width  = feed.offsetWidth;
+  overlayCanvas.height = feed.offsetHeight;
+  octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+  const scaleX = overlayCanvas.width  / feed.width;
+  const scaleY = overlayCanvas.height / feed.height;
+
+  lastResults.forEach(r => {
+    if (!r.bbox) return;
+    const [x, y, w, h] = r.bbox;
+    const sx = x * scaleX, sy = y * scaleY, sw = w * scaleX, sh = h * scaleY;
+    const isKnown = r.employee_id !== 'unknown';
+    const color = isKnown ? '#22c55e' : '#f59e0b';
+    octx.strokeStyle = color;
+    octx.lineWidth   = 2;
+    octx.shadowColor = color;
+    octx.shadowBlur  = 6;
+    octx.strokeRect(sx, sy, sw, sh);
+    octx.shadowBlur = 0;
+    if (isKnown && r.employee_details) {
+      octx.fillStyle = 'rgba(0,0,0,0.6)';
+      octx.fillRect(sx, sy - 18, sw, 18);
+      octx.fillStyle = color;
+      octx.font      = '11px Courier New';
+      octx.fillText(r.employee_details.name, sx + 4, sy - 4);
+    }
+  });
+}
+
+setInterval(syncOverlay, 100);
+
+// ─── Frame snap for card thumbnails ──────────────────────────
+function snapCrop(bbox) {
+  if (!lastFrameImg) return null;
+  snapCanvas.width  = lastFrameImg.width;
+  snapCanvas.height = lastFrameImg.height;
+  sctx.drawImage(lastFrameImg, 0, 0);
+  const [x, y, w, h] = bbox;
+  const pad = 0.3, cs = Math.max(w, h) * (1 + pad);
+  const cx = Math.max(0, x - (cs - w) / 2);
+  const cy = Math.max(0, y - (cs - h) / 2);
+  const fcs = Math.min(cs, snapCanvas.width - cx, snapCanvas.height - cy);
+  const out = document.createElement('canvas');
+  out.width = out.height = 128;
+  out.getContext('2d').drawImage(snapCanvas, cx, cy, fcs, fcs, 0, 0, 128, 128);
+  return out.toDataURL('image/jpeg', 0.85);
+}
+
+// ─── Confirmation panel state ────────────────────────────────
+const CONFIRM_MS    = 3000;   // how long the confirmed state shows
+let   confirmTimer  = null;
+// let   historyCount  = 0;
+
+function resetConfPanel() {
+  // Only reset if not in the middle of a confirmation animation
+  if (thumbWrap.classList.contains('confirmed') || thumbWrap.classList.contains('blacklisted-frame')) return;
+  empName.textContent    = 'Awaiting Recognition';
+  empIdBadge.textContent = 'ID: —';
+  empIdBadge.className   = 'emp-id-badge';
+  empDept.textContent    = '—';
+  empRole.textContent    = '—';
+  empConf.innerHTML      = '—';
+  empStatus.textContent  = 'Scanning…';
+  recogTime.textContent  = '';
+  recogTime.classList.add('hidden');
+  // Draw placeholder on faceCanvas
+  faceCanvas.width = faceCanvas.height = 200;
+  faceCtx.fillStyle = '#0f1c2d';
+  faceCtx.fillRect(0, 0, 200, 200);
+  faceCtx.fillStyle = '#1a2d42';
+  faceCtx.font = '48px Arial';
+  faceCtx.textAlign = 'center';
+  faceCtx.fillText('👤', 150, 170);
+}
+
+function showConfirmation(r, thumbDataUrl) {
+  const d            = r.employee_details || { id: r.employee_id, name: r.employee_id, department: '—', role: '—' };
+  const conf         = ((r.confidence || 0) * 100).toFixed(1);
+  const time         = new Date().toLocaleTimeString();
+  const isBlacklisted = r.is_blacklisted || false;
+
+  // ── Draw face crop on faceCanvas (use lastFrameImg for accuracy, like attendance.html)
+  faceCanvas.width = faceCanvas.height = 300;
+  if (lastFrameImg && r.bbox) {
+    // const [x, y, w, h] = r.bbox;
+    // const pad = 0.3, cs = Math.max(w, h) * (1 + pad);
+    // const cx  = Math.max(0, x - (cs - w) / 2);
+    // const cy  = Math.max(0, y - (cs - h) / 2);
+    // const fcs = Math.min(cs, lastFrameImg.width - cx, lastFrameImg.height - cy);
+    // faceCtx.drawImage(lastFrameImg, cx, cy, fcs, fcs, 0, 0, 300, 300);
+    const [x, y, w, h] = r.bbox;
+
+    // Increase visible area
+    const scaleX = 2.0;   // horizontal expansion
+    const scaleTop = 1.2; // space above head
+    const scaleBottom = 2.5; // more body below face
+
+    const cropX = Math.max(0, x - w * (scaleX - 1) / 2);
+    const cropY = Math.max(0, y - h * (scaleTop - 1));
+
+    const cropW = Math.min(
+      w * scaleX,
+      lastFrameImg.width - cropX
+    );
+
+    const cropH = Math.min(
+      h * scaleBottom,
+      lastFrameImg.height - cropY
+    );
+
+    faceCtx.drawImage(
+      lastFrameImg,
+      cropX,
+      cropY,
+      cropW,
+      cropH,
+      0,
+      0,
+      300,
+      300
+    );
+  } else if (thumbDataUrl) {
+    const img = new Image();
+    img.onload = () => { faceCtx.drawImage(img, 0, 0, 300, 300); };
+    img.src = thumbDataUrl;
+  } else {
+    faceCtx.fillStyle = '#0f1c2d';
+    faceCtx.fillRect(0, 0, 300, 300);
+  }
+
+  // ── Text details
+  empName.textContent    = d.name;
+  empIdBadge.textContent = `ID: ${d.id}`;
+  empIdBadge.className   = isBlacklisted ? 'emp-id-badge blacklisted-badge' : 'emp-id-badge';
+
+  empDept.textContent    = d.department || '—';
+  empRole.textContent    = d.role || '—';
+  empConf.innerHTML      = `<span class="${isBlacklisted ? 'blk-badge' : 'conf-badge'}">
+    <i class="fas fa-bullseye"></i>&nbsp;${conf}%</span>`;
+  empStatus.textContent  = isBlacklisted ? '⚠ BLACKLISTED' : 'Recognized ✓';
+  recogTime.textContent  = `Seen at ${time} • secondary DB`;
+  recogTime.classList.remove('hidden');
+
+  // ── Thumb border + stamp animation
+  thumbWrap.classList.remove('confirmed', 'blacklisted-frame');
+  confStamp.classList.remove('blacklist-stamp');
+  void thumbWrap.offsetWidth; // force reflow for re-animation
+  if (isBlacklisted) {
+    thumbWrap.classList.add('blacklisted-frame');
+    confStamp.classList.add('blacklist-stamp');
+    stampIcon.className = 'fas fa-triangle-exclamation';
+  } else {
+    thumbWrap.classList.add('confirmed');
+    stampIcon.className = 'fas fa-check';
+  }
+
+  // ── Auto-reset after CONFIRM_MS
+  clearTimeout(confirmTimer);
+  confirmTimer = setTimeout(() => {
+    thumbWrap.classList.remove('confirmed', 'blacklisted-frame');
+    empStatus.textContent = 'Ready for next scan';
+  }, CONFIRM_MS);
+}
+
+// ─── Handle recognition results ──────────────────────────────
+function handleResults(results) {
+  if (!Array.isArray(results) || !results.length) return;
+  lastResults = results;
+  const now = Date.now();
+
+  // Pick the best known result to show in the main panel
+  let bestKnown = null;
+
+  results.forEach(r => {
+    const id       = (r.employee_details && r.employee_details.id) || r.employee_id || 'unknown';
+    const isKnown  = id !== 'unknown';
+
+    if (!isKnown) {
+      if (now - lastUnknownTs > UNKNOWN_MS) {
+        unknownCount++;
+        document.getElementById('statUnknown').textContent = unknownCount;
+        lastUnknownTs = now;
+      }
+      return;
+    }
+
+    // Dedup per-ID for 8s
+    if (recentMap.has(id) && now - recentMap.get(id) < DEDUP_MS) return;
+    recentMap.set(id, now);
+
+    recogCount++;
+    document.getElementById('statRecog').textContent = recogCount;
+
+    // Pick highest-confidence known result for main display
+    if (!bestKnown || (r.confidence || 0) > (bestKnown.confidence || 0)) {
+      bestKnown = r;
+    }
+
+    // Add to history list regardless
+    // const thumb = r.bbox ? snapCrop(r.bbox) : null;
+    // addHistoryRow(r, thumb);
+    // totalCards++;
+    // countBadge.textContent = totalCards;
+  });
+
+  if (bestKnown) {
+    const thumb = bestKnown.bbox ? snapCrop(bestKnown.bbox) : null;
+    showConfirmation(bestKnown, thumb);
+  }
+
+  // FPS estimate
+  payloadCount++;
+  if (now - payloadTs > 2000) {
+    const fps = (payloadCount / ((now - payloadTs) / 1000)).toFixed(1);
+    document.getElementById('statFps').textContent = fps;
+    payloadTs = now; payloadCount = 0;
+  }
+}
+
+// ─── History row (compact, scrollable under the main panel) ──
+// function addHistoryRow(r, thumbDataUrl) {
+//   const d            = r.employee_details || { id: r.employee_id, name: r.employee_id, department: '—', role: '—' };
+//   const conf         = ((r.confidence || 0) * 100).toFixed(1);
+//   const time         = new Date().toLocaleTimeString();
+//   const isBlacklisted = r.is_blacklisted || false;
+
+//   historyCount++;
+//   histCount.textContent = historyCount;
+
+//   const row = document.createElement('div');
+//   row.className = `hist-row ${isBlacklisted ? 'blacklisted' : 'known'}`;
+//   row.innerHTML = `
+//     <div class="hist-thumb">
+//       ${thumbDataUrl ? `<img src="${thumbDataUrl}" alt="${d.name}"/>` : '<i class="fas fa-user"></i>'}
+//     </div>
+//     <div class="hist-info">
+//       <div class="hist-name">${d.name}${isBlacklisted ? ' ⚠' : ''}</div>
+//       <div class="hist-sub">${time} &nbsp;·&nbsp; ${conf}% &nbsp;·&nbsp; ID ${d.id}</div>
+//     </div>`;
+
+//   histList.insertBefore(row, histList.firstChild);
+//   // Cap at 40 history rows
+//   while (histList.children.length > 40) histList.removeChild(histList.lastChild);
+// }
+
+// ─── WebSocket ────────────────────────────────────────────────
+let ws, wsRetries = 0;
+let pipelineReady = false;
+
+function openWs() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const url   = `${proto}//${location.host}/ws/ephemeral/${encodeURIComponent(CAM_ID)}${QS}`;
+
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    wsRetries = 0;
+    // Do NOT call setConn('live') here — pipeline may still be loading models.
+    // Show 'Connected' only; 'LIVE' fires on first real frame.
+    setConn('Connected');
+    ws.send(JSON.stringify({
+      token:            TOKEN,
+      db_context:       'secondary',
+      ephemeral_stream: true,
+      ephemeral_ip:     IP,
+      ephemeral_cam_id: CAM_ID
+    }));
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+
+      // ── Server keepalive / status messages during pipeline init ──
+      if (data.type === 'status') {
+        if (!pipelineReady) {
+          hudBar.textContent = data.message || 'Initializing…';
+        }
+        return;
+      }
+
+      // ── Decode and render annotated frame onto the feed canvas ──
+      // CRITICAL: handleResults MUST be called inside img.onload so that
+      // lastFrameImg is set BEFORE snapCrop / showConfirmation run.
+      if (data.frame) {
+        const img = new Image();
+        img.onload = () => {
+          feed.width  = img.width;
+          feed.height = img.height;
+          feedCtx.drawImage(img, 0, 0);
+          lastFrameImg = img;   // set first — snapCrop depends on this
+
+          if (!pipelineReady) {
+            pipelineReady = true;
+            viewport.classList.add('live');
+            hudBar.classList.add('live');
+            hudBar.textContent = 'LIVE • SECONDARY DB';
+            setConn('live');
+          }
+
+          // Safe to call now — lastFrameImg is populated
+          if (data.results) handleResults(data.results);
+        };
+        img.src = `data:image/jpeg;base64,${data.frame}`;
+      } else if (data.results) {
+        // Rare: results-only payload (no frame) — only process if we have a prior frame
+        if (lastFrameImg) handleResults(data.results);
+      }
+    } catch (_) {}
+  };
+
+  ws.onclose = () => {
+    pipelineReady = false;
+    wsRetries++;
+    // Back off: 2 s, 4 s, 6 s … capped at 20 s.
+    // ArcFace model load takes ~15 s — be patient on first connect.
+    const delay = Math.min(2000 * wsRetries, 20000);
+    setConn('Reconnecting…');
+    setTimeout(openWs, delay);
+  };
+
+  ws.onerror = () => {
+    setConn('Error — retrying…');
+  };
+}
+
+openWs();
+resetConfPanel();
+
+// ─── Cleanup ──────────────────────────────────────────────────
+function goBack() {
+  try { if (ws) ws.close(); } catch(_) {}
+  sessionStorage.removeItem('ephemeral');
+  fetch(`/ephemeral/stop/${encodeURIComponent(CAM_ID)}${QS}`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + TOKEN }
+  }).catch(() => {});
+  location.replace('/ephemeral');
+}
+
+window.addEventListener('beforeunload', () => {
+  try { if (ws) ws.close(); } catch(_) {}
+});
+</script>
+</body>
+</html>
+
+

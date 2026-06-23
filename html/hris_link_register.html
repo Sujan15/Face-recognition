@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>HRIS Link Registration — Secondary DB</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<style>
+:root {
+  --bg:       #080d14;
+  --surface:  #0d1520;
+  --card:     #0f1c2d;
+  --border:   #1a2d42;
+  --border-hi:#1e3a52;
+  --accent:   #00d4ff;
+  --accent2:  #7c5cfc;
+  --ok:       #22c55e;
+  --warn:     #f59e0b;
+  --err:      #ef4444;
+  --text:     #d1e4f5;
+  --muted:    #5c7a99;
+  --dim:      #1a2d42;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  grid-template-rows: auto 1fr auto;
+  gap: 0;
+}
+
+/* ─── TOPBAR ─────────────── */
+.topbar {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.topbar h1 { font-size: 15px; font-weight: 700; color: #fff; margin-right: 4px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--card); border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 10px; color: var(--muted); font-family: 'Courier New', monospace;
+}
+.badge.ok   { border-color: rgba(34,197,94,.3); color: var(--ok); }
+.badge.blue { border-color: rgba(0,212,255,.3); color: var(--accent); }
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); padding: 7px 14px; border-radius: 8px;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: .2s;
+}
+.back-btn:hover { border-color: var(--border-hi); }
+.spacer { flex: 1; }
+.cam-badge { font-family: 'Courier New', monospace; font-size: 10px; color: var(--muted); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ─── LEFT PANEL ─────────── */
+.panel-left {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.section-label {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 4px;
+}
+
+/* Quality filter rows */
+.filt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  transition: border-color .25s, background .25s;
+}
+.filt-row .lbl { color: var(--muted); font-size: 11px; }
+.filt-row .val { font-family: 'Courier New', monospace; font-weight: 700; font-size: 11px; color: var(--dim); }
+.filt-row.pass { border-color: rgba(34,197,94,.4); background: rgba(34,197,94,.04); }
+.filt-row.pass .val { color: var(--ok); }
+.filt-row.fail { border-color: rgba(239,68,68,.3); background: rgba(239,68,68,.03); }
+.filt-row.fail .val { color: var(--err); }
+.filt-icon { width: 14px; text-align: center; font-size: 10px; }
+
+/* Separator */
+.sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* Metadata form */
+.form-field {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.form-field label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+.form-field input, .form-field select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  outline: none;
+  transition: border-color .2s;
+  width: 100%;
+}
+.form-field input:focus, .form-field select:focus { border-color: var(--accent); }
+.form-field input.required-empty { border-color: var(--err); }
+
+/* Blacklist row */
+.blacklist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.blacklist-row:hover { border-color: rgba(239,68,68,.4); }
+.blacklist-row.active { border-color: rgba(239,68,68,.5); background: rgba(239,68,68,.05); }
+.blacklist-row input[type=checkbox] { display: none; }
+.check-box {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border-hi);
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: transparent;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.blacklist-row.active .check-box { background: var(--err); border-color: var(--err); color: #fff; }
+.blacklist-label { font-size: 12px; color: var(--text); }
+.blacklist-sub   { font-size: 10px; color: var(--muted); }
+
+.note-field textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+  outline: none;
+  transition: border-color .2s;
+}
+.note-field textarea:focus { border-color: var(--accent); }
+
+/* Progress pills */
+.progress-wrap { display: flex; flex-direction: column; gap: 6px; }
+.pills { display: flex; gap: 4px; }
+.pill {
+  flex: 1; height: 4px; background: var(--dim);
+  border-radius: 2px; transition: background .3s;
+}
+.pill.filled { background: var(--ok); }
+.pill.active { background: var(--warn); animation: blink .6s infinite; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+.progress-txt { font-size: 11px; color: var(--muted); font-family: 'Courier New', monospace; }
+
+/* ─── MAIN AREA ───────────── */
+.main-area {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  min-height: 0;
+}
+
+/* Viewport */
+.viewport {
+  flex: 1;
+  position: relative;
+  background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  transition: border-color .3s, box-shadow .3s;
+  min-height: 300px;
+}
+.viewport.ready  { border-color: var(--ok);   box-shadow: 0 0 0 4px rgba(34,197,94,.1) inset; }
+.viewport.armed  { border-color: var(--warn);  box-shadow: 0 0 0 4px rgba(245,158,11,.1) inset; }
+.viewport.done   { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(0,212,255,.1) inset; }
+
+/* MJPEG feed */
+.feed {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* Corner brackets */
+.corner {
+  position: absolute;
+  width: 28px; height: 28px;
+  border: 2px solid var(--accent);
+  opacity: .6;
+}
+.corner.tl { top:10px; left:10px; border-right:0; border-bottom:0; border-radius:3px 0 0 0; }
+.corner.tr { top:10px; right:10px; border-left:0; border-bottom:0; border-radius:0 3px 0 0; }
+.corner.bl { bottom:10px; left:10px; border-right:0; border-top:0; border-radius:0 0 0 3px; }
+.corner.br { bottom:10px; right:10px; border-left:0; border-top:0; border-radius:0 0 3px 0; }
+
+/* Reticle oval */
+.reticle {
+  position: absolute; left:50%; top:50%;
+  width: 220px; height: 280px;
+  transform: translate(-50%,-50%);
+  border: 1.5px dashed rgba(0,212,255,.25);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* HUD overlay */
+.hud {
+  position: absolute;
+  top: 10px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.6);
+  border: 1px solid rgba(255,255,255,.1);
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: var(--text);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hud.ok   { border-color: rgba(34,197,94,.4); color: var(--ok); }
+.hud.warn { border-color: rgba(245,158,11,.4); color: var(--warn); }
+
+/* Flash effect */
+.flash {
+  position: absolute; inset: 0;
+  background: #fff; opacity: 0;
+  pointer-events: none;
+  transition: opacity .1s;
+}
+.flash.on { opacity: .65; }
+
+/* Hidden canvas */
+#captureCanvas { display: none; }
+
+/* ─── THUMBS STRIP ─────── */
+.thumbs-strip {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+}
+.thumb {
+  aspect-ratio: 1/1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--dim); font-size: 16px;
+  transition: border-color .2s;
+}
+.thumb.filled { border-color: rgba(34,197,94,.4); }
+.thumb img { width:100%; height:100%; object-fit:cover; }
+
+/* ─── BOTTOM ACTIONS ───── */
+.actions-bar {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 14px 20px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 22px;
+  border-radius: 10px; border: none;
+  cursor: pointer; font-weight: 600; font-size: 13px;
+  transition: all .2s;
+}
+.btn:disabled { opacity: .35; cursor: not-allowed; transform: none !important; filter: none !important; }
+.btn.start    { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #040d18; }
+.btn.start:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.1); }
+.btn.complete { background: linear-gradient(135deg, var(--ok), #16a34a); color: #052e16; }
+.btn.complete:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.1); }
+
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 8px;
+  font-size: 12px; font-weight: 600;
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+}
+.status-pill.ok   { border-color: rgba(34,197,94,.3); color: var(--ok); background: rgba(34,197,94,.06); }
+.status-pill.warn { border-color: rgba(245,158,11,.3); color: var(--warn); background: rgba(245,158,11,.06); }
+
+/* Spinner */
+.spin { animation: spin .8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Metadata Modal ──────── */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
+  border-radius: 20px;
+  padding: 32px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 40px 80px rgba(0,0,0,.6);
+  animation: slideUp .3s cubic-bezier(.4,0,.2,1);
+}
+@keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+.modal h2 { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+.modal .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modal-grid .full { grid-column: 1/-1; }
+.modal .form-field label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing:.06em; margin-bottom:4px; display:block; }
+.modal .form-field input { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:8px; font-size:13px; outline:none; transition:border-color .2s; }
+.modal .form-field input:focus { border-color: var(--accent); }
+.modal .form-field input.err { border-color: var(--err); }
+.modal-blacklist {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; cursor: pointer; transition: all .2s;
+  grid-column: 1/-1;
+}
+.modal-blacklist:hover { border-color: rgba(239,68,68,.4); }
+.modal-blacklist.active { border-color: rgba(239,68,68,.5); background: rgba(239,68,68,.06); }
+.modal-blacklist input { display: none; }
+.m-check { width:18px; height:18px; border:2px solid var(--border-hi); border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:10px; color:transparent; transition:all .2s; flex-shrink:0; }
+.modal-blacklist.active .m-check { background:var(--err); border-color:var(--err); color:#fff; }
+.modal-blacklist-info .title { font-size:13px; font-weight:600; color:var(--text); }
+.modal-blacklist-info .sub   { font-size:11px; color:var(--muted); margin-top:2px; }
+.modal-note { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:8px; font-size:12px; font-family:inherit; resize:vertical; min-height:64px; outline:none; transition:border-color .2s; }
+.modal-note:focus { border-color: var(--accent); }
+.modal-actions { display:flex; gap:10px; margin-top:20px; }
+.btn-cancel { flex:none; padding:12px 18px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; font-size:13px; font-weight:600; transition:.2s; }
+.btn-cancel:hover { border-color:var(--border-hi); }
+.btn-submit { flex:1; padding:12px; border-radius:10px; border:none; background:linear-gradient(135deg,var(--ok),#16a34a); color:#052e16; cursor:pointer; font-size:13px; font-weight:700; transition:.2s; display:flex; align-items:center; justify-content:center; gap:8px; }
+.btn-submit:hover { filter:brightness(1.08); }
+.btn-submit:disabled { opacity:.4; cursor:not-allowed; }
+.modal-error { font-size:12px; color:var(--err); margin-top:8px; display:none; }
+.modal-error.show { display:block; }
+</style>
+</head>
+<body>
+
+<!-- ─── TOPBAR ─────────────────────────────────── -->
+<header class="topbar">
+  <button class="back-btn" onclick="cleanupAndExit()"><i class="fas fa-arrow-left"></i> Back</button>
+  <h1>AI Face Registration</h1>
+  <span class="badge blue"><i class="fas fa-database"></i>&nbsp;db_context=secondary</span>
+  <span class="badge" id="camBadge"><i class="fas fa-video"></i>&nbsp;HRIS LINK</span>
+  <div class="spacer"></div>
+  <div class="cam-badge" id="ipBadge"></div>
+</header>
+
+<!-- ─── LEFT PANEL ───────────────────────────── -->
+<aside class="panel-left">
+
+  <div>
+    <div class="section-label">Live Quality Filters</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="filt-row fail" id="fFace">
+        <span class="lbl"><i class="fas fa-face-smile filt-icon"></i> Face Detected</span>
+        <span class="val">—</span>
+      </div>
+      <div class="filt-row fail" id="fClarity">
+        <span class="lbl"><i class="fas fa-eye filt-icon"></i> Clarity</span>
+        <span class="val">—</span>
+      </div>
+      <div class="filt-row fail" id="fBright">
+        <span class="lbl"><i class="fas fa-sun filt-icon"></i> Brightness</span>
+        <span class="val">—</span>
+      </div>
+      <div class="filt-row fail" id="fSize">
+        <span class="lbl"><i class="fas fa-expand filt-icon"></i> Face Size</span>
+        <span class="val">—</span>
+      </div>
+      <div class="filt-row pass" id="fPose">
+        <span class="lbl"><i class="fas fa-compass filt-icon"></i> Head Pose</span>
+        <span class="val">auto</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="progress-wrap">
+    <div class="section-label">Capture Progress</div>
+    <div class="pills" id="pills"></div>
+    <div class="progress-txt" id="progressTxt">0 / 10 frames captured</div>
+  </div>
+
+  <div class="sep"></div>
+
+  <!-- Inline metadata form (pre-fill before capture) -->
+  <div>
+    <div class="section-label">Employee Details</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="form-field">
+        <label>Employee ID *</label>
+        <input id="empId" type="text" placeholder="e.g. 100234"/>
+      </div>
+      <div class="form-field">
+        <label>Full Name *</label>
+        <input id="empName" type="text" placeholder="Full name"/>
+      </div>
+      <div class="form-field">
+        <label>Department</label>
+        <input id="empDept" type="text" placeholder="e.g. Operations"/>
+      </div>
+      <div class="form-field">
+        <label>Role</label>
+        <input id="empRole" type="text" placeholder="e.g. Worker"/>
+      </div>
+      <div class="blacklist-row" id="blacklistRow" onclick="toggleBlacklist()">
+        <input type="checkbox" id="blacklistChk"/>
+        <div class="check-box" id="checkBox"><i class="fas fa-check"></i></div>
+        <div>
+          <div class="blacklist-label">Mark as Blacklisted</div>
+          <div class="blacklist-sub">Triggers theft alert on detection</div>
+        </div>
+      </div>
+      <div class="note-field form-field">
+        <label>Note</label>
+        <textarea id="empNote" placeholder="Optional note (security reason, etc.)"></textarea>
+      </div>
+    </div>
+  </div>
+
+</aside>
+
+<!-- ─── MAIN AREA ─────────────────────────────── -->
+<main class="main-area">
+  <div class="viewport" id="viewport">
+    <img id="feed" class="feed" alt="stream" crossorigin="anonymous"/>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div class="reticle"></div>
+    <div class="hud" id="hud">Connecting to stream…</div>
+    <div class="flash" id="flash"></div>
+  </div>
+  <div class="thumbs-strip" id="thumbsStrip"></div>
+</main>
+
+<!-- ─── BOTTOM ACTIONS ──────────────────────────── -->
+<footer class="actions-bar">
+  <button class="btn start"    id="startBtn"    onclick="armCapture()" disabled>
+    <i class="fas fa-bolt"></i> Start Registration
+  </button>
+  <button class="btn complete" id="completeBtn" onclick="showMetadataModal()" disabled>
+    <i class="fas fa-check-circle"></i> Complete Registration
+  </button>
+  <div class="spacer"></div>
+  <div class="status-pill" id="statusPill"><i class="fas fa-satellite-dish"></i>&nbsp;Awaiting stream…</div>
+</footer>
+
+<!-- ─── METADATA MODAL ─────────────────────────── -->
+<div class="modal-overlay" id="metaModal">
+  <div class="modal">
+    <h2>Confirm Registration</h2>
+    <p class="modal-sub">Review details before submitting to the secondary database.</p>
+
+    <div class="modal-grid">
+      <div class="form-field">
+        <label>Employee ID *</label>
+        <input id="mEmpId" type="text" placeholder="e.g. 100234"/>
+      </div>
+      <div class="form-field">
+        <label>Full Name *</label>
+        <input id="mEmpName" type="text" placeholder="Full name"/>
+      </div>
+      <div class="form-field">
+        <label>Department</label>
+        <input id="mEmpDept" type="text" placeholder="e.g. Operations"/>
+      </div>
+      <div class="form-field">
+        <label>Role</label>
+        <input id="mEmpRole" type="text" placeholder="e.g. Worker"/>
+      </div>
+
+      <div class="modal-blacklist" id="mBlacklistRow" onclick="toggleModalBlacklist()">
+        <input type="checkbox" id="mBlacklistChk"/>
+        <div class="m-check" id="mCheckBox"><i class="fas fa-check"></i></div>
+        <div class="modal-blacklist-info">
+          <div class="title">Blacklist this person</div>
+          <div class="sub">Theft alert will fire on every detection match</div>
+        </div>
+      </div>
+
+      <div class="form-field full">
+        <label>Note (optional)</label>
+        <textarea class="modal-note" id="mEmpNote" placeholder="Security reason, context, etc."></textarea>
+      </div>
+    </div>
+
+    <div class="modal-error" id="modalErr"></div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-submit" id="submitBtn" onclick="completeRegistration()">
+        <i class="fas fa-cloud-arrow-up"></i> Submit to Secondary DB
+      </button>
+    </div>
+  </div>
+</div>
+
+<canvas id="captureCanvas"></canvas>
+
+<script>
+// ─── Guard: redirect if no session ───────────────────────────
+const session = JSON.parse(sessionStorage.getItem('ephemeral') || 'null');
+if (!session || session.mode !== 'reg') {
+  location.replace('/ephemeral');
+}
+
+const TOKEN  = localStorage.getItem('access_token') || '';
+const CAM_ID = session.camId;
+const IP     = session.ip;
+const QS     = `?db_context=secondary&ephemeral_stream=true&ephemeral_ip=${encodeURIComponent(IP)}&ephemeral_cam_id=${encodeURIComponent(CAM_ID)}`;
+
+const CFG = {
+  min_face_size:    70,
+  min_blur_clarity: 35,
+  min_brightness:   50,
+  max_brightness:   230,
+};
+const NUM = 10;
+
+// ─── DOM refs ─────────────────────────────────────────────────
+const feed        = document.getElementById('feed');
+const viewport    = document.getElementById('viewport');
+const hud         = document.getElementById('hud');
+const flash       = document.getElementById('flash');
+const startBtn    = document.getElementById('startBtn');
+const completeBtn = document.getElementById('completeBtn');
+const statusPill  = document.getElementById('statusPill');
+const progressTxt = document.getElementById('progressTxt');
+const thumbsStrip = document.getElementById('thumbsStrip');
+const pillsEl     = document.getElementById('pills');
+const cap         = document.getElementById('captureCanvas');
+const cctx        = cap.getContext('2d', { willReadFrequently: true });
+
+document.getElementById('camBadge').innerHTML = `<i class="fas fa-video"></i>&nbsp;${CAM_ID.slice(0,28)}`;
+document.getElementById('ipBadge').textContent = IP;
+
+// ─── Build thumbs & pills ────────────────────────────────────
+for (let i = 0; i < NUM; i++) {
+  thumbsStrip.insertAdjacentHTML('beforeend', `<div class="thumb" id="thumb${i}"><i class="far fa-image"></i></div>`);
+  pillsEl.insertAdjacentHTML('beforeend', `<div class="pill" id="pill${i}"></div>`);
+}
+
+// ─── State ────────────────────────────────────────────────────
+let armed         = false;
+let capturedFrames = [];
+let lastCaptureTs  = 0;
+let allFiltersPass = false;
+let feedReady      = false;
+
+// ─── Load MJPEG feed ─────────────────────────────────────────
+const cacheSep = IP.includes('?') ? '&' : '?';
+feed.src = IP + cacheSep + '_t=' + Date.now();
+feed.onload = () => {
+  feedReady = true;
+  hud.textContent = 'Stream active — position face in reticle';
+};
+feed.onerror = () => {
+  hud.textContent = 'Stream error — retrying…';
+  setTimeout(() => { feed.src = IP + cacheSep + '_t=' + Date.now(); }, 2500);
+};
+
+// ─── Quality estimation (pixel-level proxy, server enforces true checks) ──
+function setFiltRow(id, ok, valText) {
+  const el = document.getElementById(id);
+  el.querySelector('.val').textContent = valText;
+  el.className = 'filt-row ' + (ok ? 'pass' : 'fail');
+}
+
+function estimateMetrics() {
+  if (!feedReady || !feed.naturalWidth) return;
+
+  const W = 240, H = Math.round(240 * feed.naturalHeight / feed.naturalWidth);
+  cap.width = W; cap.height = H;
+  cctx.drawImage(feed, 0, 0, W, H);
+  const d = cctx.getImageData(0, 0, W, H).data;
+
+  // Brightness (luminance average)
+  let lum = 0;
+  for (let i = 0; i < d.length; i += 4)
+    lum += 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+  const brightness = lum / (W * H);
+
+  // Clarity proxy: horizontal gradient variance
+  let vSum = 0, cnt = 0;
+  for (let y = 1; y < H - 1; y += 2) {
+    for (let x = 1; x < W - 1; x += 2) {
+      const i = (y * W + x) * 4, j = i + 4;
+      const g1 = 0.299*d[i]   + 0.587*d[i+1]   + 0.114*d[i+2];
+      const g2 = 0.299*d[j]   + 0.587*d[j+1]   + 0.114*d[j+2];
+      vSum += (g2 - g1) ** 2; cnt++;
+    }
+  }
+  const clarity = vSum / cnt;
+
+  // Skin-tone face presence in central 40–60% region
+  const x0=W*.3, x1=W*.7, y0=H*.15, y1=H*.85;
+  let skin = 0, tot = 0;
+  for (let y = y0; y < y1; y += 3) {
+    for (let x = x0; x < x1; x += 3) {
+      const i = ((y|0)*W + (x|0)) * 4;
+      const r = d[i], g = d[i+1], b = d[i+2];
+      tot++;
+      if (r > 95 && g > 40 && b > 20 && r > g && r > b && Math.abs(r-g) > 15) skin++;
+    }
+  }
+  const faceDetected = (skin / tot) > 0.17;
+  const faceW = faceDetected ? Math.round((x1 - x0) * (feed.naturalWidth / W)) : 0;
+
+  const okFace    = faceDetected;
+  const okClarity = clarity > CFG.min_blur_clarity;
+  const okBright  = brightness > CFG.min_brightness && brightness < CFG.max_brightness;
+  const okSize    = faceW > CFG.min_face_size;
+
+  setFiltRow('fFace',    okFace,    faceDetected ? 'Yes' : 'No');
+  setFiltRow('fClarity', okClarity, clarity.toFixed(0) + ' / ' + CFG.min_blur_clarity);
+  setFiltRow('fBright',  okBright,  brightness.toFixed(0) + ' (' + CFG.min_brightness + '–' + CFG.max_brightness + ')');
+  setFiltRow('fSize',    okSize,    faceW + 'px / ' + CFG.min_face_size + 'px');
+  // Pose always passes client-side (server QualityChecker enforces it)
+
+  allFiltersPass = okFace && okClarity && okBright && okSize;
+
+  // Viewport border state
+  viewport.classList.toggle('ready', allFiltersPass && !armed && capturedFrames.length < NUM);
+  viewport.classList.toggle('armed', armed && allFiltersPass);
+
+  // HUD
+  if (capturedFrames.length >= NUM) {
+    hud.textContent = `✓ ${NUM} frames captured`;
+    hud.className = 'hud ok';
+  } else if (armed && allFiltersPass) {
+    hud.textContent = '● Capturing…';
+    hud.className = 'hud warn';
+  } else if (allFiltersPass) {
+    hud.textContent = '✓ Quality OK — press Start Registration';
+    hud.className = 'hud ok';
+  } else {
+    hud.textContent = 'Adjust face position / lighting';
+    hud.className = 'hud';
+  }
+
+  // Auto-capture when armed
+  if (armed && allFiltersPass && capturedFrames.length < NUM) {
+    tryCapture();
+  }
+
+  // Button state
+  startBtn.disabled = !allFiltersPass || armed || capturedFrames.length >= NUM;
+}
+
+function tryCapture() {
+  const now = Date.now();
+  if (now - lastCaptureTs < 700) return;
+  if (capturedFrames.length >= NUM) return;
+  lastCaptureTs = now;
+
+  const FW = feed.naturalWidth, FH = feed.naturalHeight;
+  cap.width = FW; cap.height = FH;
+  cctx.drawImage(feed, 0, 0, FW, FH);
+  const dataUrl = cap.toDataURL('image/jpeg', 0.9);
+  capturedFrames.push(dataUrl);
+
+  const idx = capturedFrames.length - 1;
+  const t = document.getElementById(`thumb${idx}`);
+  t.innerHTML = `<img src="${dataUrl}" alt=""/>`;
+  t.classList.add('filled');
+  document.getElementById(`pill${idx}`).classList.add('filled');
+  progressTxt.textContent = `${capturedFrames.length} / ${NUM} frames captured`;
+
+  // Flash
+  flash.classList.add('on');
+  setTimeout(() => flash.classList.remove('on'), 120);
+
+  // Status pill
+  setStatus(capturedFrames.length < NUM ? 'warn' : 'ok',
+    capturedFrames.length < NUM
+      ? `<i class="fas fa-circle-notch spin"></i>&nbsp;${capturedFrames.length}/${NUM} captured`
+      : `<i class="fas fa-check-circle"></i>&nbsp;All ${NUM} frames captured`
+  );
+
+  if (capturedFrames.length >= NUM) {
+    armed = false;
+    viewport.classList.remove('armed');
+    viewport.classList.add('done');
+    startBtn.disabled = true;
+    startBtn.innerHTML = '<i class="fas fa-check"></i> Capture Complete';
+    completeBtn.disabled = false;
+  }
+}
+
+function setStatus(type, html) {
+  statusPill.className = 'status-pill ' + type;
+  statusPill.innerHTML = html;
+}
+
+function armCapture() {
+  const id   = document.getElementById('empId').value.trim();
+  const name = document.getElementById('empName').value.trim();
+  if (!id || !name) {
+    document.getElementById('empId').classList.toggle('required-empty', !id);
+    document.getElementById('empName').classList.toggle('required-empty', !name);
+    alert('Please enter Employee ID and Full Name before starting capture.');
+    return;
+  }
+  armed = true;
+  startBtn.disabled = true;
+  startBtn.innerHTML = '<i class="fas fa-circle-notch spin"></i> Capturing…';
+  setStatus('warn', '<i class="fas fa-circle-notch spin"></i>&nbsp;Armed — auto-capturing…');
+}
+
+// ─── Blacklist toggle ─────────────────────────────────────────
+let isBlacklisted = false;
+function toggleBlacklist() {
+  isBlacklisted = !isBlacklisted;
+  document.getElementById('blacklistRow').classList.toggle('active', isBlacklisted);
+  document.getElementById('checkBox').innerHTML = isBlacklisted ? '<i class="fas fa-check"></i>' : '';
+}
+
+// ─── Metadata Modal ───────────────────────────────────────────
+let modalBlacklisted = false;
+
+function showMetadataModal() {
+  // Pre-fill from sidebar
+  document.getElementById('mEmpId').value   = document.getElementById('empId').value;
+  document.getElementById('mEmpName').value  = document.getElementById('empName').value;
+  document.getElementById('mEmpDept').value  = document.getElementById('empDept').value;
+  document.getElementById('mEmpRole').value  = document.getElementById('empRole').value;
+  document.getElementById('mEmpNote').value  = document.getElementById('empNote').value;
+  modalBlacklisted = isBlacklisted;
+  document.getElementById('mBlacklistRow').classList.toggle('active', modalBlacklisted);
+  document.getElementById('mCheckBox').innerHTML = modalBlacklisted ? '<i class="fas fa-check"></i>' : '';
+  document.getElementById('modalErr').classList.remove('show');
+  document.getElementById('metaModal').classList.add('show');
+}
+
+function toggleModalBlacklist() {
+  modalBlacklisted = !modalBlacklisted;
+  document.getElementById('mBlacklistRow').classList.toggle('active', modalBlacklisted);
+  document.getElementById('mCheckBox').innerHTML = modalBlacklisted ? '<i class="fas fa-check"></i>' : '';
+}
+
+function closeModal() {
+  document.getElementById('metaModal').classList.remove('show');
+}
+
+// ─── Complete Registration ────────────────────────────────────
+async function completeRegistration() {
+  const empId   = document.getElementById('mEmpId').value.trim();
+  const empName = document.getElementById('mEmpName').value.trim();
+
+  const idEl   = document.getElementById('mEmpId');
+  const nameEl = document.getElementById('mEmpName');
+  idEl.classList.toggle('err', !empId);
+  nameEl.classList.toggle('err', !empName);
+
+  if (!empId || !empName) {
+    showModalErr('Employee ID and Name are required.');
+    return;
+  }
+  if (!/^\d+$/.test(empId)) {
+    showModalErr('Employee ID must be numeric.');
+    idEl.classList.add('err');
+    return;
+  }
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fas fa-circle-notch spin"></i> Submitting…';
+
+  const payload = {
+    db_context:       'secondary',
+    ephemeral_stream: true,
+    ephemeral_cam_id: CAM_ID,
+    ephemeral_ip:     IP,
+    employee_id:      parseInt(empId),
+    name:             empName,
+    department:       document.getElementById('mEmpDept').value.trim() || 'General',
+    role:             document.getElementById('mEmpRole').value.trim() || 'Employee',
+    is_blacklisted:   modalBlacklisted,
+    note:             document.getElementById('mEmpNote').value.trim(),
+    images:           capturedFrames,   // base64 JPEGs; server extracts embeddings
+  };
+
+  try {
+    const res = await fetch(`/ephemeral/register/${encodeURIComponent(CAM_ID)}${QS}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+      body:    JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+      // FastAPI 422 returns detail as an array of validation errors; flatten to string
+      let errMsg;
+      if (Array.isArray(errData.detail)) {
+        errMsg = errData.detail.map(e => `${e.loc ? e.loc.join('.') + ': ' : ''}${e.msg}`).join(' | ');
+      } else {
+        errMsg = typeof errData.detail === 'string' ? errData.detail : JSON.stringify(errData.detail);
+      }
+      throw new Error(errMsg || `Server error ${res.status}`);
+    }
+
+    cleanupAndExit('✓ Registration complete — employee enrolled in secondary DB.');
+
+  } catch (e) {
+    showModalErr('Registration failed: ' + e.message + '\n\nFrames are still in memory — you can retry.');
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Submit to Secondary DB';
+  }
+}
+
+function showModalErr(msg) {
+  const el = document.getElementById('modalErr');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+// ─── Cleanup & Exit ───────────────────────────────────────────
+function cleanupAndExit(msg) {
+  armed = false;
+  try { feed.src = ''; } catch(_) {}
+  capturedFrames = [];
+  sessionStorage.removeItem('ephemeral');
+  // Tell backend to release ephemeral camera (non-blocking; best-effort)
+  fetch(`/ephemeral/stop/${encodeURIComponent(CAM_ID)}${QS}`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + TOKEN }
+  }).catch(() => {});
+  if (msg) alert(msg);
+  location.replace('/ephemeral');
+}
+
+// ─── Polling loop for quality metrics ─────────────────────────
+setInterval(estimateMetrics, 250);
+
+// ─── Notify backend to spin up ephemeral pipeline (best-effort) ───
+fetch(`/ephemeral/start/${encodeURIComponent(CAM_ID)}${QS}`, {
+  method:  'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+  body:    JSON.stringify({ db_context: 'secondary', ephemeral_stream: true, ephemeral_ip: IP })
+}).catch(() => { /* frontend still drives the capture */ });
+
+window.addEventListener('beforeunload', () => {
+  try { feed.src = ''; } catch(_) {}
+});
+</script>
+</body>
+</html>

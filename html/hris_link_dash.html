@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AI Face System</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<style>
+/* ─── DESIGN TOKENS ──────────────────────────────────────────── */
+:root {
+  --bg:        #080d14;
+  --surface:   #0d1520;
+  --card:      #111e2e;
+  --border:    #1a2d42;
+  --border-hi: #1e3a52;
+  --accent:    #00d4ff;
+  --accent2:   #7c5cfc;
+  --ok:        #22c55e;
+  --warn:      #f59e0b;
+  --err:       #ef4444;
+  --text:      #d1e4f5;
+  --muted:     #5c7a99;
+  --dim:       #2a3d52;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-x: hidden;
+}
+
+/* Subtle animated grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Glow blobs */
+body::after {
+  content: '';
+  position: fixed;
+  top: -200px;
+  left: -200px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(0,212,255,.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 960px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 52px 48px 48px;
+  box-shadow:
+    0 0 0 1px rgba(0,212,255,.04),
+    0 40px 80px rgba(0,0,0,.5),
+    0 0 60px rgba(0,212,255,.03) inset;
+}
+
+/* ── Close button ─────────────── */
+.close-btn {
+  position: absolute;
+  top: 20px; right: 20px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+}
+.close-btn:hover { background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.4); color: var(--err); }
+
+/* ── Header ───────────────────── */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,212,255,.06);
+  border: 1px solid rgba(0,212,255,.18);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.eyebrow .pulse-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 0 rgba(34,197,94,.5);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%  { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+  70% { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+  100%{ box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+
+.page-title {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.page-title span { color: var(--accent); }
+
+.page-sub {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 44px;
+  max-width: 540px;
+}
+
+/* ── Action Cards Grid ─────────── */
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .25s, box-shadow .25s;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  right: 0; height: 2px;
+  border-radius: 18px 18px 0 0;
+  opacity: 0;
+  transition: opacity .3s;
+}
+.card.reg::before { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+.card.chk::before { background: linear-gradient(90deg, var(--ok), var(--accent)); }
+.card.active, .card:hover { border-color: var(--border-hi); }
+.card.active::before, .card:hover::before { opacity: 1; }
+.card.reg.active { box-shadow: 0 0 0 1px rgba(0,212,255,.12), 0 20px 40px rgba(0,212,255,.06); }
+.card.chk.active { box-shadow: 0 0 0 1px rgba(34,197,94,.12), 0 20px 40px rgba(34,197,94,.06); }
+
+.icon-wrap {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.reg .icon-wrap { background: linear-gradient(135deg, rgba(0,212,255,.15), rgba(124,92,252,.15)); color: var(--accent); }
+.chk .icon-wrap { background: linear-gradient(135deg, rgba(34,197,94,.15), rgba(0,212,255,.15)); color: var(--ok); }
+
+.card-title { font-size: 18px; font-weight: 700; color: #fff; }
+.card-desc  { font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+/* ── Primary Action Buttons ────── */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all .2s;
+  width: 100%;
+}
+.reg .action-btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #040d18; }
+.chk .action-btn { background: linear-gradient(135deg, var(--ok), #16a34a); color: #052e16; }
+.action-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+.action-btn:active { transform: translateY(0); }
+
+/* ── Inline IP Drawer ─────────── */
+.drawer {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height .35s cubic-bezier(.4,0,.2,1), opacity .25s;
+}
+.drawer.open { max-height: 160px; opacity: 1; }
+
+.ip-group {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ip-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ip-row { display: flex; gap: 8px; }
+
+.ip-input {
+  flex: 1;
+  background: #080d14;
+  border: 1px solid var(--border-hi);
+  color: var(--text);
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.ip-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,212,255,.08); }
+.ip-input.green:focus { border-color: var(--ok); box-shadow: 0 0 0 3px rgba(34,197,94,.08); }
+
+.hint { font-size: 10px; color: var(--dim); font-family: 'Courier New', monospace; }
+.err-msg { font-size: 11px; color: var(--err); display: none; }
+.err-msg.show { display: block; }
+
+.next-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  transition: all .2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.reg .next-btn { background: rgba(0,212,255,.12); color: var(--accent); border: 1px solid rgba(0,212,255,.25); }
+.reg .next-btn:hover { background: rgba(0,212,255,.2); }
+.chk .next-btn { background: rgba(34,197,94,.12); color: var(--ok); border: 1px solid rgba(34,197,94,.25); }
+.chk .next-btn:hover { background: rgba(34,197,94,.2); }
+
+/* ── Footer Info Bar ──────────── */
+.info-bar {
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'Courier New', monospace;
+}
+.badge i { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <button class="close-btn" onclick="exitKiosk()" title="Exit Kiosk"><i class="fas fa-xmark"></i></button>
+
+  <div class="eyebrow"><span class="pulse-dot"></span>AI Face — Isolated Session</div>
+  <h1 class="page-title">AI Face System<span>.</span></h1>
+  <p class="page-sub">Temporary registration &amp; screening — camera IPs live only in session memory and are never written to DB. All face data routes to the secondary database context.</p>
+
+  <div class="cards">
+
+    <!-- ── REGISTRATION CARD ── -->
+    <div class="card reg" id="cardReg">
+      <div class="icon-wrap"><i class="fas fa-user-plus"></i></div>
+      <div>
+        <div class="card-title">Registration</div>
+        <div class="card-desc">Capture 10 quality-gated frames from a temporary camera and enroll the employee with info - into the secondary face db.</div>
+      </div>
+      <button class="action-btn" onclick="toggleDrawer('reg')">
+        <i class="fas fa-bolt" id="regBtnIcon"></i>
+        <span id="regBtnText">Begin Registration</span>
+      </button>
+      <!-- <div class="drawer" id="regDrawer">
+        <div class="ip-group">
+          <div class="ip-label"><i class="fas fa-video"></i> &nbsp;Camera Stream URL</div>
+          <div class="ip-row">
+            <input class="ip-input" id="regIp" type="text" placeholder="http://192.168.1.x:8080/video" autocomplete="off" onkeydown="if(event.key==='Enter') nextStep('reg')"/>
+            <button class="next-btn" onclick="nextStep('reg')">Next &nbsp;<i class="fas fa-arrow-right"></i></button>
+          </div>
+          <div class="hint">e.g. http://&lt;phone-ip&gt;:8080/video &nbsp;|&nbsp; rtsp://user:pass@ip:554/stream</div>
+          <div class="err-msg" id="regErr">⚠ Enter a valid http(s):// or rtsp:// stream URL.</div>
+        </div>
+      </div> -->
+      <div class="drawer" id="regDrawer">
+      <div class="ip-group">
+        <div class="ip-label"><i class="fas fa-video"></i> &nbsp;Camera Stream URL</div>
+        <div class="ip-row">
+          <input class="ip-input" id="regIp" list="regUrlList" type="text" placeholder="http://192.168.1.x:8080/video" autocomplete="off" onkeydown="if(event.key==='Enter') nextStep('reg')"/>
+          <datalist id="regUrlList"></datalist>
+          <button class="next-btn" onclick="nextStep('reg')">Next &nbsp;<i class="fas fa-arrow-right"></i></button>
+        </div>
+        <div class="hint">e.g. http://&lt;phone-ip&gt;:8080/video &nbsp;|&nbsp; rtsp://user:pass@ip:554/stream</div>
+        <div class="err-msg" id="regErr">⚠ Enter a valid http(s):// or rtsp:// stream URL.</div>
+      </div>
+    </div>
+    </div>
+
+    <!-- ── CHECK CARD ── -->
+    <div class="card chk" id="cardChk">
+      <div class="icon-wrap"><i class="fas fa-shield-halved"></i></div>
+      <div>
+        <div class="card-title">AI Face Check</div>
+        <div class="card-desc">Run live face recognition against the secondary index db. All matches and recognition logs stay in the secondary db.</div>
+      </div>
+      <button class="action-btn" onclick="toggleDrawer('chk')">
+        <i class="fas fa-magnifying-glass" id="chkBtnIcon"></i>
+        <span id="chkBtnText">Begin Check</span>
+      </button>
+      <!-- <div class="drawer" id="chkDrawer">
+        <div class="ip-group">
+          <div class="ip-label"><i class="fas fa-video"></i> &nbsp;Camera Stream URL</div>
+          <div class="ip-row">
+            <input class="ip-input green" id="chkIp" type="text" placeholder="http://192.168.1.x:8080/video" autocomplete="off" onkeydown="if(event.key==='Enter') nextStep('chk')"/>
+            <button class="next-btn" onclick="nextStep('chk')">Next &nbsp;<i class="fas fa-arrow-right"></i></button>
+          </div>
+          <div class="hint">e.g. rtsp://... or http://...:8080/video (IP Webcam MJPEG)</div>
+          <div class="err-msg" id="chkErr">⚠ Enter a valid stream URL.</div>
+        </div>
+      </div> -->
+      <div class="drawer" id="chkDrawer">
+        <div class="ip-group">
+          <div class="ip-label"><i class="fas fa-video"></i> &nbsp;Camera Stream URL</div>
+          <div class="ip-row">
+            <input class="ip-input green" id="chkIp" list="chkUrlList" type="text" placeholder="http://192.168.1.x:8080/video" autocomplete="off" onkeydown="if(event.key==='Enter') nextStep('chk')"/>
+            <datalist id="chkUrlList"></datalist>
+            <button class="next-btn" onclick="nextStep('chk')">Next &nbsp;<i class="fas fa-arrow-right"></i></button>
+          </div>
+          <div class="hint">e.g. rtsp://... or http://...:8080/video (IP Webcam MJPEG)</div>
+          <div class="err-msg" id="chkErr">⚠ Enter a valid stream URL.</div>
+        </div>
+    </div>
+    </div>
+
+  </div>
+
+  <div class="info-bar">
+    <span class="badge"><i class="fas fa-database"></i> db_context=secondary</span>
+    <span class="badge"><i class="fas fa-memory"></i> in-memory stream only</span>
+    <span class="badge"><i class="fas fa-lock"></i> CAMERA_REGISTRY: read-only</span>
+    <span style="margin-left:auto;font-size:11px;color:var(--dim);">v1.0 — AI Face Session</span>
+  </div>
+</div>
+
+<script>
+
+// ─── Load stored camera URLs into datalists ──────────────
+function loadStoredUrls() {
+  const stored = JSON.parse(localStorage.getItem('cameraUrls') || '[]');
+  // Populate both datalists
+  const regList = document.getElementById('regUrlList');
+  const chkList = document.getElementById('chkUrlList');
+  regList.innerHTML = '';
+  chkList.innerHTML = '';
+  stored.forEach(url => {
+    const opt1 = document.createElement('option');
+    opt1.value = url;
+    regList.appendChild(opt1);
+    const opt2 = document.createElement('option');
+    opt2.value = url;
+    chkList.appendChild(opt2);
+  });
+}
+// Call on load
+loadStoredUrls();
+
+
+
+// ─── Clean any stale session on landing
+sessionStorage.removeItem('ephemeral');
+
+function toggleDrawer(which) {
+  const other = which === 'reg' ? 'chk' : 'reg';
+  // Collapse the other
+  document.getElementById(other + 'Drawer').classList.remove('open');
+  document.getElementById('card' + (other === 'reg' ? 'Reg' : 'Chk')).classList.remove('active');
+  document.getElementById(other + 'Err').classList.remove('show');
+  // Toggle this one
+  const drawer = document.getElementById(which + 'Drawer');
+  const card   = document.getElementById('card' + (which === 'reg' ? 'Reg' : 'Chk'));
+  const isOpen = drawer.classList.toggle('open');
+  card.classList.toggle('active', isOpen);
+  if (isOpen) {
+    setTimeout(() => document.getElementById(which + 'Ip').focus(), 50);
+  }
+}
+
+function validate(url) {
+  return /^(https?|rtsp):\/\/.+/.test(url.trim());
+}
+
+// function nextStep(which) {
+//   const ip   = document.getElementById(which + 'Ip').value.trim();
+//   const errEl = document.getElementById(which + 'Err');
+//   if (!validate(ip)) { errEl.classList.add('show'); return; }
+//   errEl.classList.remove('show');
+//   const camId = 'EPHEMERAL-' + which.toUpperCase() + '-' + Date.now();
+//   sessionStorage.setItem('ephemeral', JSON.stringify({
+//     ip, camId, mode: which, ts: Date.now()
+//   }));
+//   location.href = which === 'reg' ? '/ephemeral/register' : '/ephemeral/check';
+// }
+function nextStep(which) {
+  const ip   = document.getElementById(which + 'Ip').value.trim();
+  const errEl = document.getElementById(which + 'Err');
+  if (!validate(ip)) { errEl.classList.add('show'); return; }
+  errEl.classList.remove('show');
+
+  // ─── Save URL to localStorage ──────────────────────────
+  let urls = JSON.parse(localStorage.getItem('cameraUrls') || '[]');
+  // Remove duplicate if exists
+  urls = urls.filter(u => u !== ip);
+  // Add to front
+  urls.unshift(ip);
+  // Keep only last 3 entries
+  if (urls.length > 3) urls = urls.slice(0, 3);
+  localStorage.setItem('cameraUrls', JSON.stringify(urls));
+
+  const camId = 'EPHEMERAL-' + which.toUpperCase() + '-' + Date.now();
+  sessionStorage.setItem('ephemeral', JSON.stringify({
+    ip, camId, mode: which, ts: Date.now()
+  }));
+  location.href = which === 'reg' ? '/ephemeral/register' : '/ephemeral/check';
+}
+
+function exitKiosk() {
+  sessionStorage.removeItem('ephemeral');
+  if (history.length > 1) history.back();
+  else location.href = '/';
+}
+</script>
+</body>
+</html>

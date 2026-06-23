@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - Face Recognition System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .login-container {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            width: 100%;
+            max-width: 480px;
+            padding: 40px;
+            text-align: center;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            color: white;
+            font-size: 36px;
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 32px;
+        }
+        .input-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .input-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 8px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+        button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        button:hover {
+            transform: translateY(-1px);
+        }
+        .register-link {
+            margin-top: 24px;
+            color: #64748b;
+            font-size: 14px;
+        }
+        .register-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .footer {
+            margin-top: 32px;
+            color: #94a3b8;
+            font-size: 12px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+        }
+        .error {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        /* Language Toggle */
+        .lang-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 6px 12px;
+            border-radius: 30px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        .lang-toggle:hover { background-color: #e2e8f0; border-color: #cbd5e1; }
+        .lang-label { font-size: 14px; font-weight: 600; color: #94a3b8; transition: color 0.3s ease; width: 24px; text-align: center; }
+        .lang-label.active { color: #0f172a; }
+        .toggle-switch { width: 32px; height: 18px; background-color: #cbd5e1; border-radius: 10px; position: relative; transition: background-color 0.3s ease; }
+        .toggle-switch::before { content: ''; position: absolute; width: 14px; height: 14px; border-radius: 50%; background-color: white; top: 2px; left: 2px; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .lang-toggle.is-bn .toggle-switch { background-color: #10b981; }
+        .lang-toggle.is-bn .toggle-switch::before { transform: translateX(14px); }
+    </style>
+</head>
+<body>
+<div class="login-container">
+    <div class="logo">
+        <i class="fas fa-user-check"></i>
+    </div>
+    <h1 id="loginTitle">Admin Login</h1>
+    <div class="subtitle" id="loginSubtitle">Face Recognition System</div>
+    
+    <div class="lang-toggle" onclick="toggleLanguage()" aria-label="Switch language">
+        <span class="lang-label en active">EN</span>
+        <div class="toggle-switch"></div>
+        <span class="lang-label bn">বাং</span>
+    </div>
+
+    <div id="errorMsg" class="error" style="display:none;"></div>
+
+    <div class="input-group">
+        <label id="empIdLabel"><i class="fas fa-id-badge"></i> Employee ID</label>
+        <input type="text" id="username" placeholder="Enter your employee ID" autocomplete="off">
+    </div>
+    <div class="input-group">
+        <label id="passwordLabel"><i class="fas fa-lock"></i> Password</label>
+        <input type="password" id="password" placeholder="Enter your HRIS password">
+    </div>
+
+    <button onclick="login()" id="signInBtn">Sign In</button>
+
+    <div class="register-link" id="registerLink">
+        New User? <a href="#">Register Here</a>
+    </div>
+    <div class="footer" id="footerText">
+        © 2025 Face Recognition System
+    </div>
+</div>
+
+<script>
+// ==================== MULTILINGUAL ====================
+const translations = {
+    en: {
+        loginTitle: "Admin Login",
+        loginSubtitle: "Face Recognition System",
+        empIdLabel: "Employee ID",
+        passwordLabel: "Password",
+        signInBtn: "Sign In",
+        registerLink: "New User? Register Here",
+        footerText: "© 2025 Face Recognition System"
+    },
+    bn: {
+        loginTitle: "অ্যাডমিন লগইন",
+        loginSubtitle: "ফেস চেনার সিস্টেম",
+        empIdLabel: "কর্মচারী আইডি",
+        passwordLabel: "পাসওয়ার্ড",
+        signInBtn: "সাইন ইন",
+        registerLink: "নতুন ব্যবহারকারী? এখানে নিবন্ধন করুন",
+        footerText: "© ২০২৫ ফেস চেনার সিস্টেম"
+    }
+};
+
+let currentLang = localStorage.getItem('preferredLang') || 'en';
+
+function applyLanguage(lang) {
+    const t = translations[lang];
+    if (!t) return;
+    for (const [key, value] of Object.entries(t)) {
+        const el = document.getElementById(key);
+        if (el) el.innerText = value;
+    }
+    // Placeholders
+    const usernamePlaceholder = document.getElementById('username');
+    const passwordPlaceholder = document.getElementById('password');
+    if (usernamePlaceholder) usernamePlaceholder.placeholder = lang === 'bn' ? 'আপনার কর্মচারী আইডি লিখুন' : 'Enter your employee ID';
+    if (passwordPlaceholder) passwordPlaceholder.placeholder = lang === 'bn' ? 'আপনার এইচআরআইএস পাসওয়ার্ড লিখুন' : 'Enter your HRIS password';
+}
+
+function switchLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('preferredLang', lang);
+    applyLanguage(lang);
+    const btn = document.querySelector('.lang-toggle');
+    const labelEn = document.querySelector('.lang-label.en');
+    const labelBn = document.querySelector('.lang-label.bn');
+    if (lang === 'bn') {
+        btn.classList.add('is-bn');
+        labelEn.classList.remove('active');
+        labelBn.classList.add('active');
+    } else {
+        btn.classList.remove('is-bn');
+        labelBn.classList.remove('active');
+        labelEn.classList.add('active');
+    }
+}
+
+function toggleLanguage() {
+    const newLang = currentLang === 'en' ? 'bn' : 'en';
+    switchLanguage(newLang);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    switchLanguage(currentLang);
+});
+// ==================== END MULTILINGUAL ====================
+
+async function login() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const errorDiv = document.getElementById('errorMsg');
+
+    if (!username || !password) {
+        errorDiv.style.display = 'block';
+        errorDiv.innerText = currentLang === 'bn' ? 'অনুগ্রহ করে কর্মচারী আইডি এবং পাসওয়ার্ড লিখুন' : 'Please enter both Employee ID and Password';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('user_role', data.role);
+            window.location.href = '/';
+        } else {
+            const error = await response.json();
+            errorDiv.style.display = 'block';
+            errorDiv.innerText = error.detail || (currentLang === 'bn' ? 'ভুল হয়েছে' : 'Invalid credentials');
+        }
+    } catch (err) {
+        errorDiv.style.display = 'block';
+        errorDiv.innerText = currentLang === 'bn' ? 'নেটওয়ার্ক ত্রুটি। আবার চেষ্টা করুন।' : 'Network error. Please try again.';
+    }
+}
+
+document.getElementById('username').addEventListener('keypress', function(e) { if (e.key === 'Enter') login(); });
+document.getElementById('password').addEventListener('keypress', function(e) { if (e.key === 'Enter') login(); });
+</script>
+</body>
+</html>
